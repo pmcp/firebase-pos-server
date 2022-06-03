@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "fanfare-pos",
+  "private_key_id": "2d5f12eba6213bcbc2d0abd60917140006f4a3fb",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCrGHixYcBpvK1y\nagmBuNEw3haLI9YZBHTbDeU1o6O/lawkCttgxOqEezxxECaBuIh4uhKrFvKYDKRi\n6N2ULny2pjOuCHlcXlKr0aZfsLxWgmeKJ3Bfex9caiD1O9Jrk4OxGkGwLGCwa9iv\nMhH5uQqjbhm9DOUiFNUhYTy0tBAfiC7Cf1egJ3yWAHn2IjG/IxBbAJSypzSPek+i\n8gBMHbCJz+NFcT6IeNOTj3WQUaB6M67Gqsg86vYv1AdhnXzQhYF2UPjaKi8WX8oz\n7WNx19J0qXL4xDu9DWhi++60L0eRriauACmujx7WCzq5X3zg2SmAM93iqs9/Ql0O\n3ACm5ObvAgMBAAECggEATWtiWamI3o+w0F/o81kE1573BnjtzR42HlUYTYBBfVSl\nsx1yjUQtdkspW2PaeMJehnp0LhTRKzo1PEhw0zeB2Ug1hF9zQvevYu4X4Z7gaijR\n3zLfZ2UYGMIxLaanHWR/p6jg5m3+RnZWc1gtyBkSFkegv+nQ2O4iTttoE8CStyEy\nYzO3tb1zWkYqZ8v3d+OIdhtGEIb8Q9tLH6CuFI0gXODI1s08RSHJqPjDfxniwYDr\nAVwuVAl7jjyqb2dvSFX8FlaHXeElar1TeIGXh5VRQBAF5ZTSPi998AOfe1nhRmy0\nse2yB27s1WjZ5xr9jwGhhHRSm4RtQbwPcZylZW/GKQKBgQDs59KazuXqy/U5Dxdg\n89rqqg7zgfV9MxKlWe88IMxiTMUbGeyQVkvbvu+HpWXN1xDqfcHpSt5VCECW9eU8\nQuo9oqdgkdLorQsmi6CR2LEVg0vmmIU2ypeXsoDLeK8niyTP90ioC4cR0FB4pr1J\n056lfLajQhmD03B2p5ifG8rPPQKBgQC44sM57QRoGtCWzlCz8fS1xcSb70afNVH/\nXDhVilOImEdk1pBrkPyyQzAA6Rrjlpzac3DfJps1jTJ0Ye51ge7TL40ghwszsmqf\n7fkrICHRo/r5EpKIXrCED93SQj+BLtM0+NbX10j3PUqtoZK//NedseUoDR0aRiRv\nUcIz3hXxmwKBgAdKhzfOgFL+nfh4l26bcrRgMX+bE1QcG0nNf8ho9gFcfYB9BsPW\ndBU6RiL1mzF/mfytjCdC757MVziOLtTw9kaZV+9n7YbNtJcmGvYCJkkUNmTNcuQh\nzhKUItSgTTu5U5O295x8ZlbNA30DHLZF9g7/zJsvsJtXCZINTGwxLce9AoGAesm3\nSJA9/fnZEF7jQC7wC4zV344RBAmAdKzFiSH+CljACZtqfNXkzWtLxT8LKZ1MfNRw\nYPOd3vnwSVUE7quldkI9Yx3s9Z+HqsF8WwTTEQzr0GFiSglBB+QVuN9gl6YGhUbC\nQMTs466kGx6UfMcqV8Pe4jObYWi2J+xPouza/AMCgYAlRWVfLw5BV0XrDTawniFC\n8lBe+s0OKQYv0zH5uS3jnhPkvl4JGAfupa3thB+C0Ttpx92p1imoSEYFOg8ZNaB3\nTiCtpU8pxSbi1Nsj59K3RZjK+TFkGhwDNRUziOX8F3N6xSH7MFG3OswkhY+GrpVB\n0n0bT7UfVv4gyBGVdvbS2A==\n-----END PRIVATE KEY-----\n",
+  "client_email": "fanfare-pos@appspot.gserviceaccount.com",
+  "client_id": "117758568910326921413",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/fanfare-pos%40appspot.gserviceaccount.com"
+}
