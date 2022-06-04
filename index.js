@@ -38,18 +38,20 @@ async function createPrinter(printer) {
     })
     const isConnected = await device.isPrinterConnected()
     console.log(`printer ${printer.name} at ${printer.location} with ip ${printer.ip} is connected: ${isConnected}`)
+
     if(isConnected) {
       // Send message to signal "Printers Is Go!"
       device.println(`Printer ${printer.location} is verbonden!`)
       device.drawLine()
       device.cut()
-      device.execute()
+      const print = await device.execute();
+      console.log('PRINT', print)
 
       resolve({device: device, info: printer});
     } else {
       reject(`printer ${printer.name} at ${printer.location} with ip ${printer.ip} is not connected.`);
     }
-    // Make an asynchronous call and either resolve or reject
+
   });
 
 }
@@ -107,6 +109,11 @@ async function printLocation(location, printer, table) {
           { text: entry.price, align: 'RIGHT', width: 0.2 },
           { text: total, align: 'RIGHT', width: 0.2 }
         ])
+        console.log('remark', entry)
+        if(entry.remark) {
+          printer.device.newLine()
+          printer.device.println(entry.remark)
+        }
       }
 
       printer.device.drawLine()
@@ -115,14 +122,19 @@ async function printLocation(location, printer, table) {
         { text: 'Totaal', align: 'LEFT', width: 0.6 },
         { text: totalPrice.toFixed(1), align: 'RIGHT', width: 0.2 }
       ])
-      printer.device.newLine()
+
       printer.device.drawLine()
       printer.device.drawLine()
       printer.device.cut()
-      printer.device.execute()
 
-      // Done with printing
-      resolve()
+      try {
+        let execute = printer.device.execute()
+        console.error("Print done!");
+        resolve()
+      } catch (error) {
+        console.log("Print failed:", error);
+        reject(error)
+      }
     }
   });
 
@@ -158,6 +170,7 @@ async function createOrders(printers, locations, table, waiterId, remarksMain) {
 }
 
 function continousCheckQueue({ printers }) {
+
   return db
     .collection('orders')
     .where('printStatus', '==', 0)
@@ -176,7 +189,6 @@ function continousCheckQueue({ printers }) {
             const remarksMain = change.doc.data().remarks
             const createdOrders = await createOrders(printers, locations, table, waiterId, remarksMain)
 
-            console.log(createdOrders)
             if(createdOrders.error) {
               console.log(createdOrders.message)
             } else {
