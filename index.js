@@ -39,7 +39,6 @@ async function createPrinter(printer) {
     const isConnected = await device.isPrinterConnected()
     console.log(`printer ${printer.name} at ${printer.location} with ip ${printer.ip} is connected: ${isConnected}`)
     if(isConnected) {
-      console.log({device: device, info: printer})
       resolve({device: device, info: printer});
     } else {
       reject(`printer ${printer.name} at ${printer.location} with ip ${printer.ip} is not connected.`);
@@ -55,7 +54,6 @@ async function getPrintersFromDb() {
   const allPrinters = await db.collection('printers').get();
   for(const doc of allPrinters.docs){
     // Only add active printers
-    console.log(doc.id, '=>', doc.data());
     if(doc.data().active !== true) return
     printers.push(doc.data())
   }
@@ -64,8 +62,6 @@ async function getPrintersFromDb() {
 
 async function printLocation(location, printer, table) {
   return new Promise(async (resolve, reject) => {
-    let totalPrice = 0
-    let totalNumber = 0
 
     let isConnected = await printer.device.isPrinterConnected();
     if(!isConnected) {
@@ -88,12 +84,14 @@ async function printLocation(location, printer, table) {
       printer.device.drawLine()
 
 
+      let totalPrice = 0
+      let totalNumber = 0
 
       for (const line in location.orders) {
         // Skip line if value (number of products) is 0
         const entry = location.orders[line]
         if(entry.value === 0) continue
-
+        console.log(entry)
         const total = (entry.price * entry.value).toFixed(1);
         totalPrice += entry.price * entry.value
         totalNumber += entry.value
@@ -105,7 +103,6 @@ async function printLocation(location, printer, table) {
         ])
       }
 
-      console.log()
       printer.device.drawLine()
       printer.device.tableCustom([
         { text: totalNumber, align: 'LEFT', width: 0.1 },
@@ -138,15 +135,12 @@ async function createOrders(printers, locations, table, waiterId, remarksMain) {
           let total = 0
           for (var key in location.orders) {
             if (location.orders.hasOwnProperty(key)) {
-              console.log(location.orders[key]);
               total = total + location.orders[key].value
             }
           }
 
           if(total > 0) return await printLocation(location, printers[location.location], table);
-          return resolve()
-
-
+          return;
         })
     )
     .then(values => {
@@ -166,18 +160,22 @@ function continousCheckQueue({ printers }) {
         .docChanges()
         .forEach(async change => {
           console.log('got a non printed order')
-          if (change.type === 'added') {
-            // updatePrintStatus(change.doc.ref.path, 1)
+          if (change.type === 'added' && change.doc.data().printStatus === 0) {
+            // PrintStatus: 0 = to print, 1 = done, 2 = doing
+            updatePrintStatus(change.doc.ref.path, 2)
+
             const locations = change.doc.data().products
             const table = change.doc.data().user
             const waiterId = change.doc.data().waiter
             const remarksMain = change.doc.data().remarks
             const createdOrders = await createOrders(printers, locations, table, waiterId, remarksMain)
 
+            console.log(createdOrders)
             if(createdOrders.error) {
               console.log(createdOrders.message)
             } else {
-              console.log(createdOrders.message)
+              console.log('Done printing')
+              updatePrintStatus(change.doc.ref.path, 1)
             }
           }
 
@@ -218,7 +216,6 @@ async function start() {
   const printers = await getPrintersFromDb()
   console.log(`In db are ${printers.length} printers`)
   const checkedPrinters = await getPrinters(printers)
-  console.log(`Checked printers`, checkedPrinters)
   // TODO: signal issue somewhere: maybe signal all devices. So: update firebase
   if(checkedPrinters.error) return;
   // All printers are good, let's go
