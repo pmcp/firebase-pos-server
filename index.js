@@ -78,7 +78,7 @@ async function printLocation(location, printer, table) {
       // Check if there are actually products for this location
       printer.device.alignCenter()
       printer.device.bold(true)
-      printer.device.println('Koninklijke Fanfare De Eendracht')
+      printer.device.println('Concertband Armonia')
       printer.device.setTextQuadArea()
       printer.device.println('Vlaamse Kermis 2022')
       printer.device.alignLeft()
