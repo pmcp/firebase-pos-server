@@ -39,6 +39,12 @@ async function createPrinter(printer) {
     const isConnected = await device.isPrinterConnected()
     console.log(`printer ${printer.name} at ${printer.location} with ip ${printer.ip} is connected: ${isConnected}`)
     if(isConnected) {
+      // Send message to signal "Printers Is Go!"
+      printer.device.println('Printer is verbonden!')
+      printer.device.drawLine()
+      printer.device.cut()
+      printer.device.execute()
+
       resolve({device: device, info: printer});
     } else {
       reject(`printer ${printer.name} at ${printer.location} with ip ${printer.ip} is not connected.`);

@@ -1,4 +1,3 @@
 #TODO
-- Fix when can't find printer s
-- Automatically start up node server
 - when printer fails, message
+- Set up server: https://medium.com/@andrew.nease.code/set-up-a-self-booting-node-js-eb56ebd05549
