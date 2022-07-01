@@ -36,16 +36,17 @@ async function createPrinter(printer) {
       type: PrinterTypes.EPSON,
       interface: `tcp://${printer.ip}`,
     })
+
     const isConnected = await device.isPrinterConnected()
     console.log(`printer ${printer.name} at ${printer.location} with ip ${printer.ip} is connected: ${isConnected}`)
-
+    // resolve({device: device, info: printer});
     if(isConnected) {
       // Send message to signal "Printers Is Go!"
       device.println(`Printer ${printer.location} is verbonden!`)
       device.drawLine()
       device.cut()
       const print = await device.execute();
-      console.log('PRINT', print)
+      device.clear()
 
       resolve({device: device, info: printer});
     } else {
@@ -70,12 +71,14 @@ async function getPrintersFromDb() {
 
 async function printLocation(location, printer, table) {
   return new Promise(async (resolve, reject) => {
-
+    console.log('HERE', printer)
     let isConnected = await printer.device.isPrinterConnected();
+
     if(!isConnected) {
       console.log(`Printer with ip ${printer.info.ip} at ${printer.info.location} is not connected`)
       reject(`printer ${printer.name} at ${printer.location} with ip ${printer.ip} is not connected.`);
     } else {
+
 
       // Check if there are actually products for this location
       printer.device.alignCenter()
@@ -95,11 +98,15 @@ async function printLocation(location, printer, table) {
       let totalPrice = 0
       let totalNumber = 0
 
-      for (const line in location.orders) {
-        // Skip line if value (number of products) is 0
-        const entry = location.orders[line]
-        if(entry.value === 0) continue
-        console.log(entry)
+
+      // Convert to array
+      const orderArray = Object.values(location.orders);
+      const filteredArray = orderArray.filter(x => x.value*1 !== 0)
+      const sortedOrder = filteredArray.sort((a, b) => (a.order*1 > b.order*1) ? 1 : -1)
+
+      console.log(sortedOrder)
+      for (var i = 0; i < sortedOrder.length; i++) {
+        const entry = sortedOrder[i]
         const total = (entry.price * entry.value).toFixed(1);
         totalPrice += entry.price * entry.value
         totalNumber += entry.value
@@ -109,10 +116,11 @@ async function printLocation(location, printer, table) {
           { text: entry.price, align: 'RIGHT', width: 0.2 },
           { text: total, align: 'RIGHT', width: 0.2 }
         ])
-        console.log('remark', entry)
+
         if(entry.remark) {
           printer.device.newLine()
           printer.device.println(entry.remark)
+          printer.device.newLine()
         }
       }
 
@@ -130,6 +138,7 @@ async function printLocation(location, printer, table) {
       try {
         let execute = printer.device.execute()
         console.error("Print done!");
+        printer.device.clear()
         resolve()
       } catch (error) {
         console.log("Print failed:", error);
@@ -156,9 +165,24 @@ async function createOrders(printers, locations, table, waiterId, remarksMain) {
               total = total + location.orders[key].value
             }
           }
+          if(total > 0) {
+            return Promise
+            .all(
+              printers[location.location].map(async (printer) => {
 
-          if(total > 0) return await printLocation(location, printers[location.location], table);
-          return;
+                return await printLocation(location, printer, table);
+              })
+            )
+            .then(values => {
+              return { 'error': false, 'message': 'All prints are done!'}
+            })
+            .catch(error => {
+              return { 'error': true, 'messages': error}
+            });
+          }
+          // console.log('is it this')
+          // return await printLocation(location, printers[location.location], table);
+
         })
     )
     .then(values => {
@@ -178,10 +202,13 @@ function continousCheckQueue({ printers }) {
       querySnapshot
         .docChanges()
         .forEach(async change => {
-          console.log('got a non printed order')
+          console.log('got a non printed order', change.doc.data().printStatus === 0)
+
           if (change.type === 'added' && change.doc.data().printStatus === 0) {
+
             // PrintStatus: 0 = to print, 1 = done, 2 = doing
-            updatePrintStatus(change.doc.ref.path, 2)
+
+            updatePrintStatus(change.doc.ref.path, 1)
 
             const locations = change.doc.data().products
             const table = change.doc.data().user
@@ -219,7 +246,11 @@ async function getPrinters(printers) {
       // Create object from array
       const printersPerLocation = values.reduce(
           (prev, curr) => {
-            prev[curr.info.location] = curr
+            if (prev[curr.info.location]) {
+              prev[curr.info.location] = [...prev[curr.info.location], curr]
+            } else {
+              prev[curr.info.location] = [curr]
+            }
             return prev
           }, {}
       );
