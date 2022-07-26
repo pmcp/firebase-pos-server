@@ -69,7 +69,7 @@ async function getPrintersFromDb() {
   return printers
 }
 
-async function printLocation(location, printer, table) {
+async function printLocation(location, printer, table, dates) {
   return new Promise(async (resolve, reject) => {
     console.log('HERE', printer)
     let isConnected = await printer.device.isPrinterConnected();
@@ -89,11 +89,16 @@ async function printLocation(location, printer, table) {
       printer.device.alignLeft()
       printer.device.setTextNormal()
       printer.device.newLine()
+      printer.device.println('TAFEL: ' + table.table)
       printer.device.bold(false)
-      printer.device.println('Tafelnummer: ' + table.table)
-      // printer.println('Besteld door: ' + waiter.displayName)
-      printer.device.drawLine()
+      printer.device.println('BESTELD: ' + dates.created)
+      printer.device.newLine()
 
+      // printer.println('Besteld door: ' + waiter.displayName)
+
+
+      printer.device.drawLine()
+      printer.device.newLine()
 
       let totalPrice = 0
       let totalNumber = 0
@@ -104,35 +109,79 @@ async function printLocation(location, printer, table) {
       const filteredArray = orderArray.filter(x => x.value*1 !== 0)
       const sortedOrder = filteredArray.sort((a, b) => (a.order*1 > b.order*1) ? 1 : -1)
 
-      console.log(sortedOrder)
+
       for (var i = 0; i < sortedOrder.length; i++) {
         const entry = sortedOrder[i]
-        const total = (entry.price * entry.value).toFixed(1);
-        totalPrice += entry.price * entry.value
-        totalNumber += entry.value
-        printer.device.tableCustom([
-          { text: entry.value, align: 'LEFT', width: 0.1 },
-          { text: entry.name, align: 'LEFT', width: 0.4 },
-          { text: entry.price, align: 'RIGHT', width: 0.2 },
-          { text: total, align: 'RIGHT', width: 0.2 }
-        ])
+        if(entry.name !== 'Opmerking Bar' && entry.name !== 'Opmerking Keuken' && entry.name !== 'Opmerking Dessert') {
+          let total = (entry.price * entry.value).toFixed(1);
+          const priceWithDecimal = (entry.price*1).toFixed(1);
+          totalPrice += entry.price * entry.value
+          totalNumber += entry.value
+          printer.device.bold(true);
+          const truncatedName = entry.name.substring(0,26);
+          printer.device.tableCustom([
+            { text: entry.value, align: 'LEFT', width: 0.1 },
+            { text: truncatedName, align: 'LEFT', width: 0.55 },
+            { text: 'x ' + priceWithDecimal, align: 'RIGHT', width: 0.15 },
+            { text: '=', align: 'RIGHT', width: 0.05 },
+            { text: total, align: 'RIGHT', width: 0.1 }
+          ])
+          printer.device.bold(false);                                         // Set text bold
+        }
+
 
         if(entry.remark) {
-          printer.device.newLine()
-          printer.device.println(entry.remark)
-          printer.device.newLine()
+          if(entry.name === 'Opmerking Bar') {
+            printer.device.newLine()
+            printer.device.bold(true);
+            printer.device.underline(true);
+            printer.device.println('OPMERKING BAR');
+            printer.device.bold(false);
+            printer.device.underline(false);
+            printer.device.println(entry.remark);
+            printer.device.newLine();
+          } else if(entry.name === 'Opmerking Dessert') {
+            printer.device.newLine()
+            printer.device.bold(true);
+            printer.device.underline(true);
+            printer.device.println('OPMERKING DESSERT');
+            printer.device.bold(false);
+            printer.device.underline(false);
+            printer.device.println(entry.remark);
+            printer.device.newLine();
+          } else if(entry.name === 'Opmerking Keuken') {
+            printer.device.newLine()
+            printer.device.bold(true);
+            printer.device.underline(true);
+            printer.device.println('OPMERKING KEUKEN');
+            printer.device.bold(false);
+            printer.device.underline(false);
+            printer.device.println(entry.remark);
+            printer.device.newLine();
+          } else {
+            printer.device.tableCustom([
+              { text: '', align: 'LEFT', width: 0.1 },
+              { text: entry.remark, align: 'LEFT', width: 0.78 },
+            ])
+          }
+
+
+
+
         }
       }
 
-      printer.device.drawLine()
-      printer.device.tableCustom([
-        { text: totalNumber, align: 'LEFT', width: 0.1 },
-        { text: 'Totaal', align: 'LEFT', width: 0.6 },
-        { text: totalPrice.toFixed(1), align: 'RIGHT', width: 0.2 }
-      ])
+
 
       printer.device.drawLine()
-      printer.device.drawLine()
+      printer.device.newLine()
+      printer.device.bold(true);
+      printer.device.tableCustom([
+        { text: totalNumber, align: 'LEFT', width: 0.1 },
+        { text: 'TOTAAL', align: 'LEFT', width: 0.65 },
+        { text: totalPrice.toFixed(1), align: 'RIGHT', width: 0.2 }
+      ])
+      printer.device.bold(false);
       printer.device.cut()
 
       try {
@@ -149,7 +198,7 @@ async function printLocation(location, printer, table) {
 
 }
 
-async function createOrders(printers, locations, table, waiterId, remarksMain) {
+async function createOrders(printers, locations, table, waiterId, remarksMain, dates) {
   // TODO: get info waiter here
   const locationsAsArray = Object.entries(locations).map(entry => {
     return {orders: entry[1], location: entry[0]};
@@ -170,7 +219,7 @@ async function createOrders(printers, locations, table, waiterId, remarksMain) {
             .all(
               printers[location.location].map(async (printer) => {
 
-                return await printLocation(location, printer, table);
+                return await printLocation(location, printer, table, dates);
               })
             )
             .then(values => {
@@ -207,14 +256,18 @@ function continousCheckQueue({ printers }) {
           if (change.type === 'added' && change.doc.data().printStatus === 0) {
 
             // PrintStatus: 0 = to print, 1 = done, 2 = doing
-
             updatePrintStatus(change.doc.ref.path, 1)
 
             const locations = change.doc.data().products
             const table = change.doc.data().user
+            const dates = {
+             created: new Date(change.doc.data().createTimestamp.toMillis()).toDateString() + ' om ' + new Date(change.doc.data().createTimestamp.toMillis()).toLocaleTimeString([], {hour12: false}),
+             printed: new Date().toDateString() + ' om ' + new Date().toLocaleTimeString([], {hour12: false})
+            }
+
             const waiterId = change.doc.data().waiter
             const remarksMain = change.doc.data().remarks
-            const createdOrders = await createOrders(printers, locations, table, waiterId, remarksMain)
+            const createdOrders = await createOrders(printers, locations, table, waiterId, remarksMain, dates)
 
             if(createdOrders.error) {
               console.log(createdOrders.message)
