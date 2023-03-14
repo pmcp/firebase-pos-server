@@ -61,6 +61,7 @@ async function getPrintersFromDb() {
   console.log('getting printers from db')
   const printers = []
   const allPrinters = await db.collection('printers').get();
+  console.log('got printers')
   for(const doc of allPrinters.docs){
     // Only add active printers
     if(doc.data().active !== true) return
