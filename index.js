@@ -86,7 +86,7 @@ async function printLocation(location, printer, table, dates) {
       printer.device.bold(true)
       printer.device.println('Concertband Armonia')
       printer.device.setTextQuadArea()
-      printer.device.println('Vlaamse Kermis 2022')
+      printer.device.println('Eetfestijn 2023')
       printer.device.alignLeft()
       printer.device.setTextNormal()
       printer.device.newLine()
@@ -130,6 +130,15 @@ async function printLocation(location, printer, table, dates) {
           printer.device.bold(false);                                         // Set text bold
         }
 
+        if(entry.options.length > 0) {
+          for (let j = 0; j < entry.options.length; j++) {
+            const option = entry.options[i]
+            printer.device.tableCustom([
+              { text: '', align: 'LEFT', width: 0.1 },
+              { text: option, align: 'LEFT', width: 0.78 }
+            ])
+          }
+        }
 
         if(entry.remark) {
           if(entry.name === 'Opmerking Bar') {
