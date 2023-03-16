@@ -133,9 +133,9 @@ async function printLocation(location, printer, table, dates) {
         if(entry.options.length > 0) {
 
           for (let j = 0; j < entry.options.length; j++) {
-            console.log('got option', entry.options, i, entry.options[i])
+            console.log('got option', entry.options, j, entry.options[j])
 
-            const option = entry.options[i]
+            const option = entry.options[j]
             printer.device.tableCustom([
               { text: '', align: 'LEFT', width: 0.1 },
               { text: option, align: 'LEFT', width: 0.78 }
