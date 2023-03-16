@@ -8,7 +8,7 @@ const app = express()
 app.use(express.json({ type: '*/*' }))
 // app.use(express.urlencoded({ extended: true }))
 
-app.listen(3002)
+app.listen(3001)
 const ThermalPrinter = require('node-thermal-printer').printer
 const PrinterTypes = require('node-thermal-printer').types
 const serviceAccount = require('./key.json')
