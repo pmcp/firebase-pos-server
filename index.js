@@ -29,8 +29,6 @@ const updatePrintStatus = function(ref, status) {
   })
 }
 
-
-
 async function printLocation(location, printer, table, dates) {
 return new Promise(async (resolve, reject) => {
     // Get the settings from the firestore
@@ -48,7 +46,6 @@ return new Promise(async (resolve, reject) => {
     printer.device.println('BESTELD: ' + dates.created)
     printer.device.newLine()
     // printer.println('Besteld door: ' + waiter.displayName)
-
     printer.device.drawLine()
     printer.device.newLine()
 
@@ -75,10 +72,7 @@ return new Promise(async (resolve, reject) => {
       }
 
       if(entry.options.length > 0) {
-
         for (let j = 0; j < entry.options.length; j++) {
-          console.log('got option', entry.options, j, entry.options[j])
-
           const option = entry.options[j]
           printer.device.tableCustom([
             { text: '', align: 'LEFT', width: 0.1 },
@@ -144,9 +138,7 @@ return new Promise(async (resolve, reject) => {
       console.log("Print failed:", error);
       reject(error)
     }
-
   });
-
 }
 
 async function createOrders(printers, locations, table, waiterId, remarksMain, dates) {
@@ -176,11 +168,9 @@ async function createOrders(printers, locations, table, waiterId, remarksMain, d
       });
 }
 
-
 function continousCheckPrinters() {
   // Start with the printer & order flow
   startPrintFlow()
-
   // Start watching printers, if we change a printer's active status, restart the print flow
   db
   .collection('printers')
@@ -260,8 +250,6 @@ async function continousCheckOrderQueue(printers) {
                       break
                     }
                   }
-
-
                   // set overall printers active to false if one printer is not active
                   if(printersForLocationActive === false) {
                     allPrintersActive = false;
@@ -269,11 +257,10 @@ async function continousCheckOrderQueue(printers) {
                   }
                 }
                 // If one of the printers is out, don't print this order.
-                // if(allPrintersActive === false) {
-                //   console.log('not all printers are connected, so not printing')
-                //   return;
-                // }
-
+                if(allPrintersActive === false) {
+                  console.log('not all printers are connected, so not printing')
+                  return;
+                }
                 // print the orders
                 const createdOrders = await createOrders(printers, locationsWithoutTheOnesWithoutOrders, table, waiterId, remarksMain, dates)
 
@@ -352,25 +339,11 @@ async function setPrinterConnectionStatus(printers){
         return {...printer, status}
       })
   )
-
-
-  for (let i = 0; i < printers.length; i++) {
-    const printer = printers[i]
-    const connected = await printer.device.isPrinterConnected()
-    if(connected) {
-      console.log(`printer ${printer.name} is connected`)
-      updatePrinterStatus(printer.fbRef, 1)
-    } else {
-      console.log(`printer ${printer.name} is NOT connected`)
-      // If not connected, update in Firebase
-      updatePrinterStatus(printer.fbRef, -1)
-    }
-  }
 }
+
 async function startPrintFlow() {
   // if there is already a watcher for order changes, unsubscribe
   if(unsubscribeOrders !== null) unsubscribeOrders()
-
   // Get printers from database
   const dbPrinters = await getPrintersFromDb()
   // Only use active printers
@@ -384,24 +357,15 @@ async function startPrintFlow() {
   )
   // Check if each Epson Device is connected
   const connectedPrinters = await setPrinterConnectionStatus(printersWithDevice)
-
   // organise printers per location
   const printersPerLocation = organisePrintersPerLocation(connectedPrinters)
-
   // Check queue for orders, this will be a continuous check (onSnapshot)
   console.log('Starting watcher orders')
   unsubscribeOrders = await continousCheckOrderQueue(printersPerLocation)
-
 }
 
 // Start the flow by creating a watcher for printer updates from firestore
 continousCheckPrinters()
-
-
-
-
-
-
 
 process.on('uncaughtException', function (err) {
   console.error((new Date).toUTCString() + ' uncaughtException:', err.message)
