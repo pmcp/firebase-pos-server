@@ -1,6 +1,5 @@
 // Start: nodemon index.js
 const admin = require('firebase-admin')
-
 const express = require('express')
 
 const app = express()
@@ -18,8 +17,10 @@ admin.initializeApp({
 })
 
 const db = admin.firestore()
-let printers = {}
-let printersPerLocation = {}
+
+// If we run start, it will return the unsubscribe function for the firestore watcher
+let unsubscribeOrders = null
+// This will be set when we start the print process
 
 const updatePrintStatus = function(ref, status) {
   const refDoc = db.doc(ref)
@@ -29,211 +30,135 @@ const updatePrintStatus = function(ref, status) {
 }
 
 
-async function createPrinter(printer) {
-  console.log(`Checking printer ${printer.name} at ${printer.location} with ip ${printer.ip}`)
-  return new Promise(async (resolve, reject) => {
-    const device = new ThermalPrinter({
-      type: PrinterTypes.EPSON,
-      interface: `tcp://${printer.ip}`,
-    })
-
-    const isConnected = await device.isPrinterConnected()
-    console.log(`printer ${printer.name} at ${printer.location} with ip ${printer.ip} is connected: ${isConnected}`)
-    // resolve({device: device, info: printer});
-    if(isConnected) {
-      // Send message to signal "Printers Is Go!"
-      device.println(`Printer ${printer.location} is verbonden!`)
-      device.drawLine()
-      device.cut()
-      const print = await device.execute();
-      device.clear()
-
-      resolve({device: device, info: printer});
-    } else {
-      reject(`printer ${printer.name} at ${printer.location} with ip ${printer.ip} is not connected.`);
-    }
-
-  });
-
-}
-
-async function getPrintersFromDb() {
-  console.log('getting printers from db')
-  const printers = []
-  const allPrinters = await db.collection('printers').get();
-  console.log('got printers')
-  for(const doc of allPrinters.docs){
-    // Only add active printers
-    if(doc.data().active !== true) return
-    printers.push(doc.data())
-  }
-  return printers
-}
 
 async function printLocation(location, printer, table, dates) {
-  return new Promise(async (resolve, reject) => {
-    console.log('HERE', printer)
-    let isConnected = await printer.device.isPrinterConnected();
+return new Promise(async (resolve, reject) => {
+    // Get the settings from the firestore
+    const dbSettings = await getSettingsFromDb()
+    printer.device.alignCenter()
+    printer.device.bold(true)
+    printer.device.println(dbSettings.organisation)
+    printer.device.setTextQuadArea()
+    printer.device.println(dbSettings.event)
+    printer.device.alignLeft()
+    printer.device.setTextNormal()
+    printer.device.newLine()
+    printer.device.println('TAFEL: ' + table.table)
+    printer.device.bold(false)
+    printer.device.println('BESTELD: ' + dates.created)
+    printer.device.newLine()
+    // printer.println('Besteld door: ' + waiter.displayName)
 
-    if(!isConnected) {
-      console.log(`Printer with ip ${printer.info.ip} at ${printer.info.location} is not connected`)
-      reject(`printer ${printer.name} at ${printer.location} with ip ${printer.ip} is not connected.`);
-    } else {
+    printer.device.drawLine()
+    printer.device.newLine()
 
+    let totalPrice = 0
+    let totalNumber = 0
 
-      // Check if there are actually products for this location
-      printer.device.alignCenter()
-      printer.device.bold(true)
-      printer.device.println('Concertband Armonia')
-      printer.device.setTextQuadArea()
-      printer.device.println('Eetfestijn 2023')
-      printer.device.alignLeft()
-      printer.device.setTextNormal()
-      printer.device.newLine()
-      printer.device.println('TAFEL: ' + table.table)
-      printer.device.bold(false)
-      printer.device.println('BESTELD: ' + dates.created)
-      printer.device.newLine()
+    for (var i = 0; i < location.orders.length; i++) {
+      const entry = location.orders[i]
+      if(entry.name !== 'Opmerking Bar' && entry.name !== 'Opmerking Keuken' && entry.name !== 'Opmerking Dessert') {
+        let total = (entry.price * entry.value).toFixed(1);
+        const priceWithDecimal = (entry.price*1).toFixed(1);
+        totalPrice += entry.price * entry.value
+        totalNumber += entry.value
+        printer.device.bold(true);
+        const truncatedName = entry.name.substring(0,26);
+        printer.device.tableCustom([
+          { text: entry.value, align: 'LEFT', width: 0.1 },
+          { text: truncatedName, align: 'LEFT', width: 0.55 },
+          { text: 'x ' + priceWithDecimal, align: 'RIGHT', width: 0.15 },
+          { text: '=', align: 'RIGHT', width: 0.05 },
+          { text: total, align: 'RIGHT', width: 0.1 }
+        ])
+        printer.device.bold(false);                                         // Set text bold
+      }
 
-      // printer.println('Besteld door: ' + waiter.displayName)
+      if(entry.options.length > 0) {
 
+        for (let j = 0; j < entry.options.length; j++) {
+          console.log('got option', entry.options, j, entry.options[j])
 
-      printer.device.drawLine()
-      printer.device.newLine()
-
-      let totalPrice = 0
-      let totalNumber = 0
-
-
-      // Convert to array
-      const orderArray = Object.values(location.orders);
-      const filteredArray = orderArray.filter(x => x.value*1 !== 0)
-      const sortedOrder = filteredArray.sort((a, b) => (a.order*1 > b.order*1) ? 1 : -1)
-
-
-      for (var i = 0; i < sortedOrder.length; i++) {
-        const entry = sortedOrder[i]
-        if(entry.name !== 'Opmerking Bar' && entry.name !== 'Opmerking Keuken' && entry.name !== 'Opmerking Dessert') {
-          let total = (entry.price * entry.value).toFixed(1);
-          const priceWithDecimal = (entry.price*1).toFixed(1);
-          totalPrice += entry.price * entry.value
-          totalNumber += entry.value
-          printer.device.bold(true);
-          const truncatedName = entry.name.substring(0,26);
+          const option = entry.options[j]
           printer.device.tableCustom([
-            { text: entry.value, align: 'LEFT', width: 0.1 },
-            { text: truncatedName, align: 'LEFT', width: 0.55 },
-            { text: 'x ' + priceWithDecimal, align: 'RIGHT', width: 0.15 },
-            { text: '=', align: 'RIGHT', width: 0.05 },
-            { text: total, align: 'RIGHT', width: 0.1 }
+            { text: '', align: 'LEFT', width: 0.1 },
+            { text: option, align: 'LEFT', width: 0.78 }
           ])
-          printer.device.bold(false);                                         // Set text bold
-        }
-
-        if(entry.options.length > 0) {
-
-          for (let j = 0; j < entry.options.length; j++) {
-            console.log('got option', entry.options, j, entry.options[j])
-
-            const option = entry.options[j]
-            printer.device.tableCustom([
-              { text: '', align: 'LEFT', width: 0.1 },
-              { text: option, align: 'LEFT', width: 0.78 }
-            ])
-          }
-        }
-
-        if(entry.remark) {
-          if(entry.name === 'Opmerking Bar') {
-            printer.device.newLine()
-            printer.device.bold(true);
-            printer.device.underline(true);
-            printer.device.println('OPMERKING BAR');
-            printer.device.bold(false);
-            printer.device.underline(false);
-            printer.device.println(entry.remark);
-            printer.device.newLine();
-          } else if(entry.name === 'Opmerking Dessert') {
-            printer.device.newLine()
-            printer.device.bold(true);
-            printer.device.underline(true);
-            printer.device.println('OPMERKING DESSERT');
-            printer.device.bold(false);
-            printer.device.underline(false);
-            printer.device.println(entry.remark);
-            printer.device.newLine();
-          } else if(entry.name === 'Opmerking Keuken') {
-            printer.device.newLine()
-            printer.device.bold(true);
-            printer.device.underline(true);
-            printer.device.println('OPMERKING KEUKEN');
-            printer.device.bold(false);
-            printer.device.underline(false);
-            printer.device.println(entry.remark);
-            printer.device.newLine();
-          } else {
-            printer.device.tableCustom([
-              { text: '', align: 'LEFT', width: 0.1 },
-              { text: entry.remark, align: 'LEFT', width: 0.78 },
-            ])
-          }
-
-
-
-
         }
       }
 
-
-
-      printer.device.drawLine()
-      printer.device.newLine()
-      printer.device.bold(true);
-      printer.device.tableCustom([
-        { text: totalNumber, align: 'LEFT', width: 0.1 },
-        { text: 'TOTAAL', align: 'LEFT', width: 0.65 },
-        { text: totalPrice.toFixed(1), align: 'RIGHT', width: 0.2 }
-      ])
-      printer.device.bold(false);
-      printer.device.cut()
-
-      try {
-        let execute = printer.device.execute()
-        console.error("Print done!");
-        printer.device.clear()
-        resolve()
-      } catch (error) {
-        console.log("Print failed:", error);
-        reject(error)
+      if(entry.remark) {
+        if(entry.name === 'Opmerking Bar') {
+          printer.device.newLine()
+          printer.device.bold(true);
+          printer.device.underline(true);
+          printer.device.println('OPMERKING BAR');
+          printer.device.bold(false);
+          printer.device.underline(false);
+          printer.device.println(entry.remark);
+          printer.device.newLine();
+        } else if(entry.name === 'Opmerking Dessert') {
+          printer.device.newLine()
+          printer.device.bold(true);
+          printer.device.underline(true);
+          printer.device.println('OPMERKING DESSERT');
+          printer.device.bold(false);
+          printer.device.underline(false);
+          printer.device.println(entry.remark);
+          printer.device.newLine();
+        } else if(entry.name === 'Opmerking Keuken') {
+          printer.device.newLine()
+          printer.device.bold(true);
+          printer.device.underline(true);
+          printer.device.println('OPMERKING KEUKEN');
+          printer.device.bold(false);
+          printer.device.underline(false);
+          printer.device.println(entry.remark);
+          printer.device.newLine();
+        } else {
+          printer.device.tableCustom([
+            { text: '', align: 'LEFT', width: 0.1 },
+            { text: entry.remark, align: 'LEFT', width: 0.78 },
+          ])
+        }
       }
     }
+
+    printer.device.drawLine()
+    printer.device.newLine()
+    printer.device.bold(true);
+    printer.device.tableCustom([
+      { text: totalNumber, align: 'LEFT', width: 0.1 },
+      { text: 'TOTAAL', align: 'LEFT', width: 0.65 },
+      { text: totalPrice.toFixed(1), align: 'RIGHT', width: 0.2 }
+    ])
+    printer.device.bold(false);
+    printer.device.cut()
+
+    try {
+      let execute = printer.device.execute()
+      console.error("Print done!");
+      printer.device.clear()
+      resolve()
+    } catch (error) {
+      console.log("Print failed:", error);
+      reject(error)
+    }
+
   });
 
 }
 
 async function createOrders(printers, locations, table, waiterId, remarksMain, dates) {
   // TODO: get info waiter here
-  const locationsAsArray = Object.entries(locations).map(entry => {
-    return {orders: entry[1], location: entry[0]};
-  });
-
   return Promise
-    .all(
-        locationsAsArray.map(async (location) => {
-          // If no orders in this order, skip
-          let total = 0
-          for (var key in location.orders) {
-            if (location.orders.hasOwnProperty(key)) {
-              total = total + location.orders[key].value
-            }
-          }
-          if(total > 0) {
+      .all(
+          locations.map(async (location) => {
             return Promise
             .all(
-              printers[location.location].map(async (printer) => {
-
-                return await printLocation(location, printer, table, dates);
-              })
+                printers[location.location].map(async (printer) => {
+                  return await printLocation(location, printer, table, dates);
+                })
             )
             .then(values => {
               return { 'error': false, 'message': 'All prints are done!'}
@@ -241,105 +166,242 @@ async function createOrders(printers, locations, table, waiterId, remarksMain, d
             .catch(error => {
               return { 'error': true, 'messages': error}
             });
-          }
-          // console.log('is it this')
-          // return await printLocation(location, printers[location.location], table);
-
-        })
-    )
-    .then(values => {
-      return { 'error': false, 'message': 'All prints are done!'}
-    })
-    .catch(error => {
-      return { 'error': true, 'messages': error}
-    });
-}
-
-function continousCheckQueue({ printers }) {
-
-  return db
-    .collection('orders')
-    .where('printStatus', '==', 0)
-    .onSnapshot(querySnapshot => {
-      querySnapshot
-        .docChanges()
-        .forEach(async change => {
-          console.log('got a non printed order', change.doc.data().printStatus === 0)
-
-          if (change.type === 'added' && change.doc.data().printStatus === 0) {
-
-            // PrintStatus: 0 = to print, 1 = done, 2 = doing
-            updatePrintStatus(change.doc.ref.path, 1)
-
-            const locations = change.doc.data().products
-            const table = change.doc.data().user
-            const dates = {
-             created: new Date(change.doc.data().createTimestamp.toMillis()).toDateString() + ' om ' + new Date(change.doc.data().createTimestamp.toMillis()).toLocaleTimeString([], {hour12: false}),
-             printed: new Date().toDateString() + ' om ' + new Date().toLocaleTimeString([], {hour12: false})
-            }
-
-            const waiterId = change.doc.data().waiter
-            const remarksMain = change.doc.data().remarks
-            const createdOrders = await createOrders(printers, locations, table, waiterId, remarksMain, dates)
-
-            if(createdOrders.error) {
-              console.log(createdOrders.message)
-            } else {
-              console.log('Done printing')
-              updatePrintStatus(change.doc.ref.path, 1)
-            }
-          }
-
-          if (change.type === 'modified') {
-            console.log('ORDER MODIFIED')
-          }
-          if (change.type === 'removed') {
-            console.log('ORDER REMOVED')
-          }
-        })
-    })
-}
-
-async function getPrinters(printers) {
-  console.log('Getting printers')
-  return Promise
-    .all(
-      printers.map(async (printer) => {
-        return await createPrinter(printer);
+          })
+      )
+      .then(values => {
+        return { 'error': false, 'message': 'All prints are done!'}
       })
-    )
-    .then(values => {
-      // Create object from array
-      const printersPerLocation = values.reduce(
-          (prev, curr) => {
-            if (prev[curr.info.location]) {
-              prev[curr.info.location] = [...prev[curr.info.location], curr]
-            } else {
-              prev[curr.info.location] = [curr]
-            }
-            return prev
-          }, {}
-      );
-      return { 'error': false, 'message': 'All printers are go!', printersPerLocation}
+      .catch(error => {
+        return { 'error': true, 'messages': error}
+      });
+}
+
+
+function continousCheckPrinters() {
+  // Start with the printer & order flow
+  startPrintFlow()
+
+  // Start watching printers, if we change a printer's active status, restart the print flow
+  db
+  .collection('printers')
+  .onSnapshot(querySnapshot => {
+    querySnapshot
+    .docChanges()
+    .forEach(async change => {
+      if (change.type === 'modified') {
+        console.log('PRINTER MODIFIED')
+        startPrintFlow()
+      }
     })
-    .catch(error => {
-      return { 'error': true, 'message': error}
-    });
+  })
 }
 
-async function start() {
-  const printers = await getPrintersFromDb()
-  console.log(`In db are ${printers.length} printers`)
-  const checkedPrinters = await getPrinters(printers)
-  // TODO: signal issue somewhere: maybe signal all devices. So: update firebase
-  if(checkedPrinters.error) return;
-  // All printers are good, let's go
+function organisePrintersPerLocation(printers) {
+  return printers.reduce(
+      (prev, curr) => {
+        if (prev[curr.location]) {
+          prev[curr.location] = [...prev[curr.location], curr]
+        } else {
+          prev[curr.location] = [curr]
+        }
+        return prev
+      }, {}
+  );
+}
+
+async function continousCheckOrderQueue(printers) {
+  const unsub = db
+      .collection('orders')
+      .where('printStatus', '==', 0)
+      .onSnapshot(querySnapshot => {
+        querySnapshot
+            .docChanges()
+            .forEach(async change => {
+              console.log('got a non printed order', change.doc.data().printStatus === 0)
+              if (change.type === 'added' && change.doc.data().printStatus === 0) {
+                // PrintStatus: 0 = to print, 1 = done, 2 = doing
+                const locations = change.doc.data().products
+                const table = change.doc.data().user
+                const dates = {
+                  created: new Date(change.doc.data().createTimestamp.toMillis()).toDateString() + ' om ' + new Date(change.doc.data().createTimestamp.toMillis()).toLocaleTimeString([], {hour12: false}),
+                  printed: new Date().toDateString() + ' om ' + new Date().toLocaleTimeString([], {hour12: false})
+                }
+                const waiterId = change.doc.data().waiter
+                const remarksMain = change.doc.data().remarks
+                // Create an array of objects, with a location, and the orders of this location
+                const locationsAsArray = Object.entries(locations).map(entry => {
+                  return {orders: entry[1], location: entry[0]};
+                });
+                // Create an array of the orders (is now object of objects)
+                const locationsAsArrayWithOrdersAsArray = locationsAsArray.map(location => {
+                  const orderArray = Object.values(location.orders);
+                  // Filter out products with value 0
+                  const filteredArray = orderArray.filter(x => x.value*1 !== 0)
+                  // Sort products
+                  const sortedOrder = filteredArray.sort((a, b) => (a.order*1 > b.order*1) ? 1 : -1)
+                  return {...location, orders: sortedOrder}
+                })
+                // Filter out the printer without orders
+                const locationsWithoutTheOnesWithoutOrders = locationsAsArrayWithOrdersAsArray.filter(l => l.orders.length > 0)
+
+                // Check if all printers we need are online
+                let allPrintersActive = true
+                for (let i = 0; i < locationsWithoutTheOnesWithoutOrders.length; i++) {
+                  const location = locationsWithoutTheOnesWithoutOrders[i].location
+                  // Check if printers in this location are online
+                  const connectedPrinters = await setPrinterConnectionStatus(printers[location])
+                  console.log('GOT PRINTERS', connectedPrinters)
+                  // Check if all printers for this location are connected
+                  let printersForLocationActive = true
+                  for (let j = 0; j < connectedPrinters.length; j++) {
+                    const printer = connectedPrinters[i]
+                    if(printer.status === -1) {
+                      printersForLocationActive = false
+                      break
+                    }
+                  }
+
+
+                  // set overall printers active to false if one printer is not active
+                  if(printersForLocationActive === false) {
+                    allPrintersActive = false;
+                    break
+                  }
+                }
+                // If one of the printers is out, don't print this order.
+                // if(allPrintersActive === false) {
+                //   console.log('not all printers are connected, so not printing')
+                //   return;
+                // }
+
+                // print the orders
+                const createdOrders = await createOrders(printers, locationsWithoutTheOnesWithoutOrders, table, waiterId, remarksMain, dates)
+
+                if(createdOrders.error) {
+                  console.log(createdOrders.message)
+                } else {
+                  console.log('Done printing')
+                  return updatePrintStatus(change.doc.ref.path, 1)
+                }
+              }
+
+              if (change.type === 'modified') {
+                console.log('ORDER MODIFIED')
+              }
+              if (change.type === 'removed') {
+                console.log('ORDER REMOVED')
+              }
+            })
+      })
+
+  return unsub
+}
+
+const updatePrinterStatus = function(ref, value) {
+  const refDoc = db.collection('printers').doc(ref)
+  refDoc.update({
+    status: value
+  })
+}
+
+async function addDeviceToPrinter(printerTypes, ip) {
+  return new ThermalPrinter({
+    type: PrinterTypes.EPSON,
+    interface: `tcp://${ip}`,
+  })
+
+}
+async function getPrintersFromDb() {
+  const printers = []
+  const allPrinters = await db.collection('printers')
+      .where('active', '==', true)
+      .get();
+  for(const doc of allPrinters.docs){
+    // Only add active printers
+    let data = doc.data()
+    data.fbRef = doc.id
+    printers.push(data)
+  }
+  return printers
+}
+
+async function getSettingsFromDb() {
+  const settingsRef = db.collection('settings').doc('printInfo');
+  const doc = await settingsRef.get();
+  if (!doc.exists) {
+    console.log('No such document!');
+  } else {
+    console.log('Document data:', doc.data());
+  }
+  return doc.data()
+}
+
+async function setPrinterConnectionStatus(printers){
+  return await Promise.all(
+      printers.map(async (printer) => {
+        const connected = await printer.device.isPrinterConnected()
+        let status;
+        if(connected) {
+          console.log(`printer ${printer.name} is connected`)
+          status = 1
+        } else {
+          console.log(`printer ${printer.name} is NOT connected`)
+          status = -1
+        }
+        updatePrinterStatus(printer.fbRef, status)
+        return {...printer, status}
+      })
+  )
+
+
+  for (let i = 0; i < printers.length; i++) {
+    const printer = printers[i]
+    const connected = await printer.device.isPrinterConnected()
+    if(connected) {
+      console.log(`printer ${printer.name} is connected`)
+      updatePrinterStatus(printer.fbRef, 1)
+    } else {
+      console.log(`printer ${printer.name} is NOT connected`)
+      // If not connected, update in Firebase
+      updatePrinterStatus(printer.fbRef, -1)
+    }
+  }
+}
+async function startPrintFlow() {
+  // if there is already a watcher for order changes, unsubscribe
+  if(unsubscribeOrders !== null) unsubscribeOrders()
+
+  // Get printers from database
+  const dbPrinters = await getPrintersFromDb()
+  // Only use active printers
+  const activePrinters = dbPrinters.filter(p => p.active)
+  // For each printer: add an Epson device
+  const printersWithDevice = await Promise.all(
+      activePrinters.map(async (p) => {
+        const printerWithDevice = await addDeviceToPrinter(PrinterTypes, p.ip)
+        return {device: printerWithDevice, ...p}
+      })
+  )
+  // Check if each Epson Device is connected
+  const connectedPrinters = await setPrinterConnectionStatus(printersWithDevice)
+
+  // organise printers per location
+  const printersPerLocation = organisePrintersPerLocation(connectedPrinters)
+
   // Check queue for orders, this will be a continuous check (onSnapshot)
-  const printersPerLocation = checkedPrinters.printersPerLocation
-  await continousCheckQueue({ printers: printersPerLocation})
+  console.log('Starting watcher orders')
+  unsubscribeOrders = await continousCheckOrderQueue(printersPerLocation)
+
 }
 
-start()
+// Start the flow by creating a watcher for printer updates from firestore
+continousCheckPrinters()
+
+
+
+
+
+
 
 process.on('uncaughtException', function (err) {
   console.error((new Date).toUTCString() + ' uncaughtException:', err.message)
