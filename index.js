@@ -226,17 +226,28 @@ async function continousCheckOrderQueue(printers) {
                         for (let i = 0; i < locationsWithoutTheOnesWithoutOrders.length; i++) {
                             const location = locationsWithoutTheOnesWithoutOrders[i].location
                             // Check if printers in this location are online
-                            const connectedPrinters = await setPrinterConnectionStatus(printers[location])
-                            // Check if all printers for this location are connected
+                            console.log('coming from check', printers[location])
+                            // If no active printers are in the location, printers[location] will return undefined.
+                            // In that case connectedPrinters is empty.
+                            let connectedPrinters = []
                             let printersForLocationActive = true
-                            // TODO: Some error here: "Cannot read properties of undefined (reading 'status')"
-                            for (let j = 0; j < connectedPrinters.length; j++) {
-                                const printer = connectedPrinters[i]
-                                if (printer.status === -1) {
-                                    printersForLocationActive = false
-                                    break
+                            if(printers[location] !== undefined) {
+                                connectedPrinters = await setPrinterConnectionStatus(printers[location])
+                                // console.log(location, connectedPrinters)
+                                // Check if all printers for this location are connected
+                                // TODO: Some error here: "Cannot read properties of undefined (reading 'status')"
+                                for (let j = 1; j < connectedPrinters.length; j++) {
+                                    const printer = connectedPrinters[i]
+                                    // console.log(printer)
+                                    if (printer.status === -1) {
+                                        console.log('I AM HERE')
+                                        printersForLocationActive = false
+                                        break
+                                    }
                                 }
                             }
+
+
                             // set overall printers active to false if one printer needed in this order is not active
                             if (printersForLocationActive === false) {
                                 allPrintersActive = false;
@@ -333,8 +344,14 @@ async function getSettingsFromDb() {
 }
 
 async function setPrinterConnectionStatus(printers) {
+
+    if(printers === undefined) {
+        console.log('PRINTERS UNDEFINED',printers)
+    }
+
     return await Promise.all(
         printers.map(async (printer) => {
+
             const connected = await printer.device.isPrinterConnected()
             let status;
             if (connected) {
@@ -365,6 +382,7 @@ async function startPrintFlow() {
         })
     )
     // Check if each Epson Device is connected
+    console.log('coming from start')
     const connectedPrinters = await setPrinterConnectionStatus(printersWithDevice)
     // organise printers per location
     const printersPerLocation = organisePrintersPerLocation(connectedPrinters)
