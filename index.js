@@ -353,6 +353,7 @@ async function setPrinterConnectionStatus(printers) {
         printers.map(async (printer) => {
 
             const connected = await printer.device.isPrinterConnected()
+            console.log(connected)
             let status;
             if (connected) {
                 console.log(`printer ${printer.name} is connected`)
@@ -381,6 +382,7 @@ async function startPrintFlow() {
             return {device: printerWithDevice, ...p}
         })
     )
+
     // Check if each Epson Device is connected
     console.log('coming from start')
     const connectedPrinters = await setPrinterConnectionStatus(printersWithDevice)
