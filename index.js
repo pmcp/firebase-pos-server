@@ -46,7 +46,9 @@ async function printLocation(location, printer, table, dates) {
         printer.device.alignLeft()
         printer.device.setTextNormal()
         printer.device.newLine()
+        printer.setTextSize(7,7);
         printer.device.println('TAFEL: ' + table.table)
+        printer.setTextNormal();
         printer.device.bold(false)
         printer.device.println('BESTELD: ' + dates.created)
         printer.device.newLine()
@@ -94,7 +96,9 @@ async function printLocation(location, printer, table, dates) {
                     printer.device.println('OPMERKING BAR');
                     printer.device.bold(false);
                     printer.device.underline(false);
+                    printer.bold(true);
                     printer.device.println(entry.remark);
+                    printer.bold(false);
                     printer.device.newLine();
                 } else if (entry.name === 'Opmerking Dessert') {
                     printer.device.newLine()
@@ -103,7 +107,9 @@ async function printLocation(location, printer, table, dates) {
                     printer.device.println('OPMERKING DESSERT');
                     printer.device.bold(false);
                     printer.device.underline(false);
+                    printer.bold(true);
                     printer.device.println(entry.remark);
+                    printer.bold(false);
                     printer.device.newLine();
                 } else if (entry.name === 'Opmerking Keuken') {
                     printer.device.newLine()
@@ -112,7 +118,9 @@ async function printLocation(location, printer, table, dates) {
                     printer.device.println('OPMERKING KEUKEN');
                     printer.device.bold(false);
                     printer.device.underline(false);
+                    printer.bold(true);
                     printer.device.println(entry.remark);
+                    printer.bold(false);
                     printer.device.newLine();
                 } else {
                     printer.device.tableCustom([
